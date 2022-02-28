@@ -1,6 +1,6 @@
-# Taking off with Materialize, Redpanda and dbt
+# Market data example with Materialize, Redpanda and dbt
 
-This is a sample project with enough plumbing to spin up an end-to-end analytics pipeline using Materialize, Redpanda and dbt to explore real-time data.
+This is a sample project with enough plumbing to spin up an end-to-end analytics pipeline using Materialize, Redpanda and dbt to explore real-time data. This implementation of the project is based on the sample [Materialize + Redpanda Hack Day sample application](https://github.com/MaterializeInc/mz-hack-day-2022). This application is designed to ingest static reference data for various US equities and join with a near-real-time streaming price data feed.
 
 ## Setup
 
@@ -12,15 +12,16 @@ The project uses [Docker Compose](https://docs.docker.com/get-started/08_using_c
 
 * **Data generator**
 
-  Finding streaming data to play with isn't always a breeze, so we wired up a data generator that polls the [OpenSky Network API](https://openskynetwork.github.io/opensky-api/index.html) continuously to save you some time! For details like poll frequency and message schema, or just a template to create a message producer for a different source of data, check the [`data-generator` directory](./data-generator/README.md).
+  The data generator for this project is a Python task that queries the [Yahoo Finance API](https://github.com/ranaroussi/yfinance) for security data and real-time prices.
+  For details like poll frequency and message schema, or just a template to create a message producer for a different source of data, check the [`data-generator` directory](./data-generator/README.md).
 
 * **Redpanda**
 
-  The data generator produces JSON-formatted events with flight information into the `flight_information` Redpanda topic. You can think of Redpanda as your source of truth, the system that stores and distributes your business-critical data downstream.
+  The data generator produces JSON-formatted events with market data information into the `kf-mktdata-ticks` Redpanda topic. You can think of Redpanda as your source of truth, the system that stores and distributes your business-critical data downstream.
 
 * **Materialize**
 
-  Materialize is set up to consume streaming flight information from Redpanda, as well as static aircraft reference data from a JSON file. Any sources and transformations are defined through dbt! We've also included `mzcli` (a `psql`-like SQL client) in the setup, so you can easily connect to the running Materialize instance.
+  Materialize is set up to consume streaming market data information from Redpanda, as well as static security data from a JSON file. Any sources and transformations are defined through dbt! `mzcli` (a `psql`-like SQL client) is also included in the setup, so you can easily connect to the running Materialize instance.
 
 * **dbt**
 
@@ -84,7 +85,7 @@ docker-compose exec redpanda rpk topic list
 and that there's data landing from the `data-generator`:
 
 ```bash
-docker-compose exec redpanda rpk topic consume flight_information
+docker-compose exec redpanda rpk topic consume kf-mktdata-ticks
 ```
 
 To exit the consumer, press **Ctrl+C**.
@@ -113,17 +114,17 @@ dbt debug
 
 > **Note:** any changes you make to the `/dbt` directory locally, like adding new models, will be shipped to the container automatically.
 
-We've created a few core models that take care of defining [_sources_](https://materialize.com/docs/overview/api-components/#sources) in Materialize:
+A few core models take care of defining [_sources_](https://materialize.com/docs/overview/api-components/#sources) in Materialize:
 
-* `rp_flight_information.sql`
+* `rp_market_data.sql`
 
-* `icao_mapping.sql`
+* `security_data.sql`
 
 , as well as some staging [_views_](https://materialize.com/docs/overview/api-components/#non-materialized-views) to transform the source data:
 
-* `stg_flight_information.sql`
+* `stg_market_data.sql`
 
-* `stg_icao_mapping.sql`
+* `stg_security_data.sql`
 
 To (optionally) install the [`materialize-dbt-utils`](https://hub.getdbt.com/materializeinc/materialize_dbt_utils/latest/) package and [run](https://docs.getdbt.com/reference/commands/run) the models:
 
@@ -164,8 +165,8 @@ SHOW SOURCES;
 
          name
 -----------------------
- icao_mapping
- rp_flight_information
+ security_data
+ rp_market_data
 ```
 
 ```sql
@@ -173,12 +174,12 @@ SHOW VIEWS;
 
           name
 ------------------------
- fct_flight
- stg_flight_information
- stg_icao_mapping
+ fct_market_data
+ stg_market_data
+ stg_security_data
 ```
 
-You'll notice that you're only able to `SELECT` from `fct_flight` — this is because it is the only [**materialized** view](https://materialize.com/docs/overview/api-components/#materialized-views)! This view is incrementally updated as new data streams in, so you get fresh and correct results with low latency. Behind the scenes, Materialize is indexing the results of the embedded query in memory.
+You'll notice that you're only able to `SELECT` from `fct_market_data` — this is because it is the only [**materialized** view](https://materialize.com/docs/overview/api-components/#materialized-views)! This view is incrementally updated as new data streams in, so you get fresh and correct results with low latency. Behind the scenes, Materialize is indexing the results of the embedded query in memory.
 
 ## Metabase
 
@@ -196,7 +197,7 @@ To visualize the results in Metabase:
 Field             | Value
 ----------------- | ----------------
 Database          | PostgreSQL
-Name              | opensky
+Name              | marketdata
 Host              | **materialized**
 Port              | **6875**
 Database name     | **materialize**

@@ -7,7 +7,6 @@ SELECT mktdata.ticker,
        company_name
        sector,
        industry,
-       business_summary,
        website,
        logo_url,
        bid_price,

@@ -9,7 +9,8 @@ services:
     environment:
       - KAFKA_BROKERS=${RP_BROKERS}
       - KAFKA_MARKET_DATA_TOPIC=kf-mktdata-ticks
-      - TICKERS="MSFT AAPL GOOGL ZM XOM DDOG UBER AMAT HOOD AMZN NVDA IBM GS SNOW RIVN VOO IOT"
+      - TICKERS=${SUBSCRIBED_TICKERS}
+      - SUBSCRIBED_FIELDS=${SUBSCRIBED_FIELDS}
     volumes:
       - ./data-generator/marketdata.py:/docker/marketdata/marketdata.py
   redpanda:
